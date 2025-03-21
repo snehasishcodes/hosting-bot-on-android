@@ -1,13 +1,14 @@
 const { Client, Events, GatewayIntentBits, Collection, REST, Routes } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
+const generateResponse = require("./lib/generate");
 require("dotenv").config();
 
 const CLIENT_ID = "1349807784450986075";
 const TOKEN = process.env.BOT_TOKEN;
 const GUILD_ID = "1207976390377603102"
 
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent] });
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessages] });
 
 // command handling
 const commands = [];
@@ -69,6 +70,59 @@ client.on(Events.InteractionCreate, async interaction => {
             await interaction.followUp({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
         } else {
             await interaction.reply({ content: 'There was an error while executing this command!', flags: MessageFlags.Ephemeral });
+        }
+    }
+});
+
+// event: message create for AI response
+client.on(Events.MessageCreate, async (message) => {
+    if (message.author.bot === true) return;
+
+    const content = message.content;
+
+    if (content.toLowerCase().startsWith("ai:")) {
+        const prompt = content.substring(3, content.length).trim();
+        message.channel.sendTyping();
+        const response = await generateResponse(prompt);
+
+        if (response.length > 1800) {
+            const totalChunks = Math.ceil(response.length / 1800);
+            for (let i = 0; i < totalChunks; i++) {
+                const chunk = response.substring(i * 1800, Math.min((i + 1) * 1800, response.length));
+
+                message.channel.send({
+                    content: chunk
+                })
+            }
+        } else {
+            message.reply({
+                content: response
+            });
+        }
+    }
+    else {
+        const isSpecialChannel = ["1352236809559605261"].includes(message.channel.id);
+        const probabilities = isSpecialChannel ? [1] : [0, 0, 0, 0, 1, 0, 0];
+        const chosenEvent = probabilities[Math.floor(Math.random() * probabilities.length)];
+        if (chosenEvent === 1) {
+            const prompt = content;
+            message.channel.sendTyping();
+            const response = await generateResponse(prompt);
+
+            if (response.length > 1800) {
+                const totalChunks = Math.ceil(response.length / 1800);
+                for (let i = 0; i < totalChunks; i++) {
+                    const chunk = response.substring(i * 1800, Math.min((i + 1) * 1800, response.length));
+
+                    message.channel.send({
+                        content: chunk
+                    })
+                }
+            } else {
+                message.reply({
+                    content: response
+                });
+            }
         }
     }
 });
